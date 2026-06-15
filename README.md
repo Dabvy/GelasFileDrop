@@ -1,5 +1,7 @@
 # GelasFileDrop
 
+In veel organisaties moeten bestanden veilig worden uitgewisseld tussen systemen. Denk aan bedrijfsdocumenten, software builds of gevoelige gegevens. Wanneer bestandsoverdracht niet goed beveiligd is kan dit leiden tot datalekken, manipulatie van bestanden of ongeautoriseerde toegang. In dit project ontwikkelen we een veilig bestandstransfersysteem waarmee bestanden veilig kunnen worden verzonden tussen systemen. Het systeem moet rekening houden met vertrouwelijkheid (confidentiality), integriteit (integrity) en authenticatie (authentication).
+
 # Achtergrond en Probleemstelling
 
 In moderne organisaties is het heel belangrijk om digitale bestanden veilig uit te wisselen tussen verschillende systemen. Denk hierbij aan het overdragen van gevoelige bedrijfsdocumenten, software builds of persoonsgegevens.
