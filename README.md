@@ -47,7 +47,3 @@ Er wordt een strikt rechtensysteem toegepast, zodat systemen alleen toegang hebb
 Een document met de architectuur- en beveiligingsontwerp.
 
 Een functionerend bestandstransfersysteem dat aan de veiligheidseisen voldoet.
-
-Een testrapport met de resultaten van penetratietesten en integriteitscontroles.
-
-Documentatie voor de installatie, configuratie en API-integratie.
