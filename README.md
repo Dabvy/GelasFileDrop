@@ -1,7 +1,5 @@
 # GelasFileDrop
 
-# GelasFileDrop
-
 # Achtergrond en Probleemstelling
 
 In moderne organisaties is het heel belangrijk om digitale bestanden veilig uit te wisselen tussen verschillende systemen. Denk hierbij aan het overdragen van gevoelige bedrijfsdocumenten, software builds of persoonsgegevens.
