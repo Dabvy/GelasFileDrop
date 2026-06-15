@@ -24,36 +24,26 @@ Het doel van dit project is om een Secure File Transfer System te ontwerpen, ont
 
 Het systeem zal worden gebouwd rondom de volgende drie belangrijkste onderdelen:
 
-Vertrouwelijkheid
+Vertrouwelijkheid:
 
 Alle bestanden moeten tijdens het transport versleuteld zijn met moderne, sterke encryptieprotocollen.
 
 Bestanden die tijdelijk of permanent op de server worden opgeslagen, dienen te worden versleuteld.
 
-Integriteit
+Integriteit:
 
 Het systeem moet bij verzending en ontvangst automatisch cryptografische hashes berekenen en vergelijken. Hiermee wordt gegarandeerd dat het bestand onderweg niet is aangepast of beschadigd.
 
 Indien een hash niet overeenkomt, wordt de overdracht afgebroken en krijgt de beheerder een melding.
 
-Authenticatie en Autorisatie
+Authenticatie en Autorisatie:
 
 Systemen die bestanden verzenden of ontvangen moeten zich verplicht authenticeren.
 
 Er wordt een strikt rechtensysteem toegepast, zodat systemen alleen toegang hebben tot de specifieke mappen en bestanden die voor hen bedoeld zijn.
-
-# Aanvullende Systeemeisen
-
-Het systeem houdt een onwijzigbaar logboek bij van alle transacties.
-
-Het systeem moet via een API of CLI-aansturing eenvoudig te integreren zijn in bestaande geautomatiseerde workflows.
 
 # Beoogde Resultaten
 
 Een document met de architectuur- en beveiligingsontwerp.
 
 Een functionerend bestandstransfersysteem dat aan de veiligheidseisen voldoet.
-
-Een testrapport met de resultaten van penetratietesten en integriteitscontroles.
-
-Documentatie voor de installatie, configuratie en API-integratie.
