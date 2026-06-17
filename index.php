@@ -12,27 +12,32 @@ if (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] == 'off') {
     exit;
 }
 
-// Verbinding met database
-$db = new mysqli("localhost", "root", "", "filedrop");
+// Database (PDO)
+try {
+    $db = new PDO(
+        "mysql:host=localhost;dbname=filedrop;charset=utf8mb4",
+        "root",
+        ""
+    );
+
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+} catch (PDOException $e) {
+    die("Database connection failed.");
+}
 
 // Download bestand via ID
 if (isset($_GET["id"])) {
 
     $s = $db->prepare(
-        "SELECT filename,mime_type,file_data,recipient
+        "SELECT filename, mime_type, file_data
          FROM uploads
-         WHERE id=?"
+         WHERE id = ?"
     );
 
-    $s->bind_param("s", $_GET["id"]);
-    $s->execute();
+    $s->execute([$_GET["id"]]);
 
-    if ($f = $s->get_result()->fetch_assoc()) {
-
-        // Alleen de bedoelde ontvanger mag downloaden
-        if ($_SESSION["username"] !== $f["recipient"]) {
-            exit("You are not allowed to download this file.");
-        }
+    if ($f = $s->fetch(PDO::FETCH_ASSOC)) {
 
         header("Content-Type: " . $f["mime_type"]);
         header(
@@ -52,80 +57,56 @@ $error = "";
 // Upload verwerken
 if (!empty($_FILES["filename"]) && $_FILES["filename"]["error"] == 0) {
 
-    $recipient = trim($_POST["recipient"] ?? "");
-
-    // Controleer of gebruiker bestaat
-    $check = $db->prepare(
-        "SELECT id
-         FROM users
-         WHERE username=?"
-    );
-
-    $check->bind_param("s", $recipient);
-    $check->execute();
-
-    if (!$check->get_result()->fetch_assoc()) {
-        $error = "User does not exist.";
-    }
-
-    // Toegestane extensies
     $ext = strtolower(
         pathinfo($_FILES["filename"]["name"], PATHINFO_EXTENSION)
     );
 
     $allowed = ["png", "jpg", "jpeg", "gif"];
 
-    if (!$error) {
+    // Controleer extensie
+    if (!in_array($ext, $allowed))
+        $error = "Only PNG, JPG, JPEG and GIF allowed.";
 
-        // Controleer extensie
-        if (!in_array($ext, $allowed))
-            $error = "Only PNG, JPG, JPEG and GIF allowed.";
+    // Controleer grootte
+    elseif ($_FILES["filename"]["size"] > 1048576)
+        $error = "Max size is 1 MB.";
 
-        // Controleer maximale grootte (1 MB)
-        elseif ($_FILES["filename"]["size"] > 1048576)
-            $error = "Max size is 1 MB.";
+    // Controleer image
+    elseif (!getimagesize($_FILES["filename"]["tmp_name"]))
+        $error = "Invalid image.";
 
-        // Controleer of het echt een afbeelding is
-        elseif (!getimagesize($_FILES["filename"]["tmp_name"]))
-            $error = "Invalid image.";
+    else {
 
-        else {
+        $id = bin2hex(random_bytes(16));
+        $name = $_FILES["filename"]["name"];
+        $mime = mime_content_type($_FILES["filename"]["tmp_name"]);
+        $data = file_get_contents($_FILES["filename"]["tmp_name"]);
 
-            $id = md5(uniqid());
-            $name = $_FILES["filename"]["name"];
-            $mime = mime_content_type($_FILES["filename"]["tmp_name"]);
-            $data = file_get_contents($_FILES["filename"]["tmp_name"]);
+        $s = $db->prepare(
+            "INSERT INTO uploads
+            (id, filename, mime_type, file_data)
+            VALUES (?, ?, ?, ?)"
+        );
 
-            $s = $db->prepare(
-                "INSERT INTO uploads
-                (id, filename, mime_type, file_data, recipient)
-                VALUES (?, ?, ?, ?, ?)"
-            );
+        $s->execute([
+            $id,
+            $name,
+            $mime,
+            $data
+        ]);
 
-            $s->bind_param(
-                "sssss",
-                $id,
-                $name,
-                $mime,
-                $data,
-                $recipient
-            );
+        $_SESSION["link"] =
+            "https://" .
+            $_SERVER["HTTP_HOST"] .
+            strtok($_SERVER["REQUEST_URI"], '?') .
+            "?id=" . $id;
 
-            $s->execute();
-
-            $_SESSION["link"] =
-                "https://" .
-                $_SERVER["HTTP_HOST"] .
-                strtok($_SERVER["REQUEST_URI"], '?') .
-                "?id=" . $id;
-
-            header("Location: " . $_SERVER["PHP_SELF"]);
-            exit;
-        }
+        header("Location: " . $_SERVER["PHP_SELF"]);
+        exit;
     }
 }
 
-// Link ophalen en daarna verwijderen uit sessie
+// Link ophalen
 $link = $_SESSION["link"] ?? "";
 unset($_SESSION["link"]);
 ?>
@@ -141,7 +122,7 @@ unset($_SESSION["link"]);
 
 <p>
     Logged in as:
-    <?= htmlspecialchars($_SESSION["username"]) ?>
+    <?= htmlspecialchars($_SESSION["username"] ?? "Unknown") ?>
 </p>
 
 <p>
@@ -157,18 +138,11 @@ unset($_SESSION["link"]);
 
 <p>Max size: 1 MB</p>
 
-<?php if ($error) echo "<p>$error</p>"; ?>
+<?php if ($error): ?>
+<p><?= htmlspecialchars($error) ?></p>
+<?php endif; ?>
 
 <form method="post" enctype="multipart/form-data">
-
-    <input
-        type="text"
-        name="recipient"
-        placeholder="Send to username"
-        required
-    >
-
-    <br><br>
 
     <input
         type="file"
