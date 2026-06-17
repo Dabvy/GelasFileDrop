@@ -1,49 +1,46 @@
-# GelasFileDrop
+# GelasFileDrop – Secure File Transfer System
+Projectbeschrijving
 
-In veel organisaties moeten bestanden veilig worden uitgewisseld tussen systemen. Denk aan bedrijfsdocumenten, software builds of gevoelige gegevens. Wanneer bestandsoverdracht niet goed beveiligd is kan dit leiden tot datalekken, manipulatie van bestanden of ongeautoriseerde toegang. In dit project ontwikkelen we een veilig bestandstransfersysteem waarmee bestanden veilig kunnen worden verzonden tussen systemen. Het systeem moet rekening houden met vertrouwelijkheid (confidentiality), integriteit (integrity) en authenticatie (authentication).
+GelasFileDrop is een beveiligd bestandstransfersysteem waarmee gebruikers bestanden kunnen uploaden en downloaden binnen een afgeschermde omgeving. Het systeem is ontwikkeld met focus op vertrouwelijkheid, integriteit en authenticatie.
 
-# Achtergrond en Probleemstelling
+## Doel
 
-In moderne organisaties is het heel belangrijk om digitale bestanden veilig uit te wisselen tussen verschillende systemen. Denk hierbij aan het overdragen van gevoelige bedrijfsdocumenten, software builds of persoonsgegevens.
+Het doel is om een veilige manier te bieden voor het uitwisselen van bestanden en risico’s zoals datalekken, bestandsmanipulatie en ongeautoriseerde toegang te voorkomen.
 
-Wanneer deze bestanden via onveilige kanalen of oude protocollen worden overgedragen, ontstaan er grote risico's. Dit kan leiden tot:
+## Beveiliging
+Vertrouwelijkheid
 
-Datalekken: gevoelige informatie die op straat komt te liggen.
+Alleen ingelogde gebruikers hebben toegang tot bestanden. Het systeem draait uitsluitend via een beveiligde HTTPS-verbinding.
 
-Bestandsmanipulatie: kwaadwillenden die data ongemerkt aanpassen tijdens het transport.
+## Integriteit
 
-Ongeautoriseerde toegang: personen of systemen die toegang krijgen tot bestanden waar zij geen rechten voor hebben.
+Bestanden worden gecontroleerd bij upload en alleen toegestane bestandstypen worden geaccepteerd.
 
-Om deze risico's te minimaliseren, is er behoefte aan een centraal, robuust en veilig bestandstransfersysteem.
+##A uthenticatie
 
-# Projectdoelstelling
+Gebruikers moeten inloggen voordat zij gebruik kunnen maken van upload- en downloadfuncties.
 
-Het doel van dit project is om een Secure File Transfer System te ontwerpen, ontwikkelen en implementeren. Dit systeem zorgt ervoor dat bestanden tussen systemen worden uitgewisseld met strikte naleving van de drie belangrijkste principes van informatiebeveiliging: vertrouwelijkheid, integriteit en authenticatie.
+## Functionaliteiten
+Inloggen en sessiebeheer
+Beveiligde bestand-upload (alleen afbeeldingen)
+Bestanden opslaan in database met unieke ID
+Downloaden via unieke link
+Automatische linkgeneratie na upload
+Database
 
-# Functionele en Technische Vereisten
+## Bestanden worden opgeslagen in een database met:
 
-Het systeem zal worden gebouwd rondom de volgende drie belangrijkste onderdelen:
-
-Vertrouwelijkheid:
-
-Alle bestanden moeten tijdens het transport versleuteld zijn met moderne, sterke encryptieprotocollen.
-
-Bestanden die tijdelijk of permanent op de server worden opgeslagen, dienen te worden versleuteld.
-
-Integriteit:
-
-Het systeem moet bij verzending en ontvangst automatisch cryptografische hashes berekenen en vergelijken. Hiermee wordt gegarandeerd dat het bestand onderweg niet is aangepast of beschadigd.
-
-Indien een hash niet overeenkomt, wordt de overdracht afgebroken en krijgt de beheerder een melding.
-
-Authenticatie en Autorisatie:
-
-Systemen die bestanden verzenden of ontvangen moeten zich verplicht authenticeren.
-
-Er wordt een strikt rechtensysteem toegepast, zodat systemen alleen toegang hebben tot de specifieke mappen en bestanden die voor hen bedoeld zijn.
-
-# Beoogde Resultaten
-
-Een document met de architectuur- en beveiligingsontwerp.
-
-Een functionerend bestandstransfersysteem dat aan de veiligheidseisen voldoet.
+Unieke ID
+Bestandsnaam
+Bestandstype
+Bestandsinhoud
+Beveiligingsmaatregelen
+HTTPS verplicht
+Alleen geauthenticeerde toegang
+Bestandstype- en groottecontrole
+Veilige databasequeries
+Mogelijke verbeteringen
+Encryptie van opgeslagen bestanden
+Hashing voor integriteitscontrole
+Tijdelijke downloadlinks
+Logging en monitoring
