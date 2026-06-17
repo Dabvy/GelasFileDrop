@@ -1,6 +1,11 @@
 <?php
 session_start();
 
+if (!isset($_SESSION["user_id"])) {
+    header("Location: loginLogic/login.php");
+    exit;
+}
+
 // Forceer HTTPS
 if (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] == 'off') {
     header("Location: https://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
@@ -14,7 +19,7 @@ $db = new mysqli("localhost", "root", "", "filedrop");
 if (isset($_GET["id"])) {
 
     $s = $db->prepare(
-        "SELECT filename,mime_type,file_data
+        "SELECT filename,mime_type,file_data,recipient
          FROM uploads
          WHERE id=?"
     );
@@ -22,12 +27,18 @@ if (isset($_GET["id"])) {
     $s->bind_param("s", $_GET["id"]);
     $s->execute();
 
-    // Bestand gevonden
     if ($f = $s->get_result()->fetch_assoc()) {
 
-        header("Content-Type: ".$f["mime_type"]);
+        // Alleen de bedoelde ontvanger mag downloaden
+        if ($_SESSION["username"] !== $f["recipient"]) {
+            exit("You are not allowed to download this file.");
+        }
+
+        header("Content-Type: " . $f["mime_type"]);
         header(
-            'Content-Disposition: attachment; filename="'.$f["filename"].'"'
+            'Content-Disposition: attachment; filename="' .
+            $f["filename"] .
+            '"'
         );
 
         exit($f["file_data"]);
@@ -41,51 +52,76 @@ $error = "";
 // Upload verwerken
 if (!empty($_FILES["filename"]) && $_FILES["filename"]["error"] == 0) {
 
+    $recipient = trim($_POST["recipient"] ?? "");
+
+    // Controleer of gebruiker bestaat
+    $check = $db->prepare(
+        "SELECT id
+         FROM users
+         WHERE username=?"
+    );
+
+    $check->bind_param("s", $recipient);
+    $check->execute();
+
+    if (!$check->get_result()->fetch_assoc()) {
+        $error = "User does not exist.";
+    }
+
     // Toegestane extensies
     $ext = strtolower(
         pathinfo($_FILES["filename"]["name"], PATHINFO_EXTENSION)
     );
 
-    $allowed = ["png","jpg","jpeg","gif"];
+    $allowed = ["png", "jpg", "jpeg", "gif"];
 
-    // Controleer extensie
-    if (!in_array($ext, $allowed))
-        $error = "Only PNG, JPG, JPEG and GIF allowed.";
+    if (!$error) {
 
-    // Controleer maximale grootte (1 MB)
-    elseif ($_FILES["filename"]["size"] > 1048576)
-        $error = "Max size is 1 MB.";
+        // Controleer extensie
+        if (!in_array($ext, $allowed))
+            $error = "Only PNG, JPG, JPEG and GIF allowed.";
 
-    // Controleer of het echt een afbeelding is
-    elseif (!getimagesize($_FILES["filename"]["tmp_name"]))
-        $error = "Invalid image.";
+        // Controleer maximale grootte (1 MB)
+        elseif ($_FILES["filename"]["size"] > 1048576)
+            $error = "Max size is 1 MB.";
 
-    else {
+        // Controleer of het echt een afbeelding is
+        elseif (!getimagesize($_FILES["filename"]["tmp_name"]))
+            $error = "Invalid image.";
 
-        // Bestandgegevens ophalen
-        $id = md5(uniqid());
-        $name = $_FILES["filename"]["name"];
-        $mime = mime_content_type($_FILES["filename"]["tmp_name"]);
-        $data = file_get_contents($_FILES["filename"]["tmp_name"]);
+        else {
 
-        // Opslaan in database
-        $s = $db->prepare(
-            "INSERT INTO uploads (id, filename, mime_type, file_data)
-             VALUES (?, ?, ?, ?)"
-        );
+            $id = md5(uniqid());
+            $name = $_FILES["filename"]["name"];
+            $mime = mime_content_type($_FILES["filename"]["tmp_name"]);
+            $data = file_get_contents($_FILES["filename"]["tmp_name"]);
 
-        $s->bind_param("ssss", $id, $name, $mime, $data);
-        $s->execute();
+            $s = $db->prepare(
+                "INSERT INTO uploads
+                (id, filename, mime_type, file_data, recipient)
+                VALUES (?, ?, ?, ?, ?)"
+            );
 
-        // Downloadlink opslaan voor na redirect
-        $_SESSION["link"] =
-            "https://" .
-            $_SERVER["HTTP_HOST"] .
-            strtok($_SERVER["REQUEST_URI"], '?') .
-            "?id=" . $id;
+            $s->bind_param(
+                "sssss",
+                $id,
+                $name,
+                $mime,
+                $data,
+                $recipient
+            );
 
-        header("Location: ".$_SERVER["PHP_SELF"]);
-        exit;
+            $s->execute();
+
+            $_SESSION["link"] =
+                "https://" .
+                $_SERVER["HTTP_HOST"] .
+                strtok($_SERVER["REQUEST_URI"], '?') .
+                "?id=" . $id;
+
+            header("Location: " . $_SERVER["PHP_SELF"]);
+            exit;
+        }
     }
 }
 
@@ -103,7 +139,15 @@ unset($_SESSION["link"]);
 
 <h2>GelasFileDrop</h2>
 
-<!-- Ondersteunde bestandstypes -->
+<p>
+    Logged in as:
+    <?= htmlspecialchars($_SESSION["username"]) ?>
+</p>
+
+<p>
+    <a href="loginLogic/logout.php">Logout</a>
+</p>
+
 <ul>
     <li>PNG</li>
     <li>JPG</li>
@@ -113,32 +157,42 @@ unset($_SESSION["link"]);
 
 <p>Max size: 1 MB</p>
 
-<!-- Eventuele foutmelding tonen -->
 <?php if ($error) echo "<p>$error</p>"; ?>
 
-<!-- Uploadformulier -->
 <form method="post" enctype="multipart/form-data">
+
+    <input
+        type="text"
+        name="recipient"
+        placeholder="Send to username"
+        required
+    >
+
+    <br><br>
+
     <input
         type="file"
         name="filename"
         accept=".png,.jpg,.jpeg,.gif"
         required
     >
+
     <input type="submit" value="Upload">
+
 </form>
 
-<!-- Downloadlink tonen na upload -->
 <?php if ($link): ?>
+
 <p>Upload successful!</p>
 
 <a href="<?= htmlspecialchars($link) ?>" id="link">
     <?= htmlspecialchars($link) ?>
 </a>
 
-<!-- Knop om link te kopiëren -->
 <button onclick="navigator.clipboard.writeText(document.getElementById('link').href)">
     Copy
 </button>
+
 <?php endif; ?>
 
 </body>
