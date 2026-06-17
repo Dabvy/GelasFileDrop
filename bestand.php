@@ -1,31 +1,4 @@
 <?php
-session_start();
-
-if (!isset($_SESSION["user_id"])) {
-    header("Location: loginLogic/login.php");
-    exit;
-}
-
-// Forceer HTTPS
-if (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] == 'off') {
-    header("Location: https://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
-    exit;
-}
-
-// Database (PDO)
-try {
-    $db = new PDO(
-        "mysql:host=localhost;dbname=filedrop;charset=utf8mb4",
-        "root",
-        ""
-    );
-
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-} catch (PDOException $e) {
-    die("Database connection failed.");
-}
-
 /**
  * Functie om data te versleutelen met AES-256-CBC
  */
@@ -127,43 +100,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['geheimBestand']) && 
         $melding = "<p style='color: red;'>Fout: Alleen JPG, JPEG, PNG en GIF bestanden zijn toegestaan.</p>";
     }
 }
-
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="nl">
 <head>
-    <title>GelasFileDrop</title>
+    <meta charset="UTF-8">
+    <title>Afbeelding Encryptie Systeem</title>
 </head>
 <body>
 
-<h2>GelasFileDrop</h2>
-
-<p>
-    Logged in as:
-    <?= htmlspecialchars($_SESSION["username"] ?? "Unknown") ?>
-</p>
-
-<p>
-    <a href="loginLogic/logout.php">Logout</a>
-</p>
-
-<ul>
-    <li>PNG</li>
-    <li>JPG</li>
-    <li>JPEG</li>
-    <li>GIF</li>
-</ul>
-
-<p>Max size: 1 MB</p>
-
+    <h2>Upload een afbeelding:</h2>
     <?php echo $melding; ?>
-    
-    <form method="POST" action="bestand.php" enctype="multipart/form-data">
-        <input type="file" name="geheimBestand" accept="image/png, image/jpeg, image/jpg, image/gif" required><br><br>
-        <button type="submit">Upload en Versleutel Afbeelding</button>
-    </form>
-
 
 </body>
 </html>
