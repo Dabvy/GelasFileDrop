@@ -1,6 +1,11 @@
 <?php
 session_start();
 
+define(
+    'ENCRYPTION_KEY',
+    hex2bin('d5a7e8b4c9f1a2d3e4f567890123456789abcdef0123456789abcdef01234567')
+);
+
 if (!isset($_SESSION["user_id"])) {
     header("Location: loginLogic/login.php");
     exit;
@@ -82,19 +87,36 @@ if (!empty($_FILES["filename"]) && $_FILES["filename"]["error"] == 0) {
         $mime = mime_content_type($_FILES["filename"]["tmp_name"]);
         $data = file_get_contents($_FILES["filename"]["tmp_name"]);
 
-        $s = $db->prepare(
-            "INSERT INTO uploads
-            (id, filename, mime_type, file_data)
-            VALUES (?, ?, ?, ?)"
-        );
+$iv = random_bytes(16);
 
-        $s->execute([
-            $id,
-            $name,
-            $mime,
-            $data
-        ]);
+$encryptedData = openssl_encrypt(
+    $data,
+    'AES-256-CBC',
+    ENCRYPTION_KEY,
+    OPENSSL_RAW_DATA,
+    $iv
+);
 
+$hmac = hash_hmac(
+    'sha256',
+    $encryptedData,
+    ENCRYPTION_KEY
+);
+
+$s = $db->prepare(
+    "INSERT INTO uploads
+    (id, filename, mime_type, file_data, file_iv, file_hmac)
+    VALUES (?, ?, ?, ?, ?, ?)"
+);
+
+$s->execute([
+    $id,
+    $name,
+    $mime,
+    $encryptedData,
+    $iv,
+    $hmac
+]);
         $_SESSION["link"] =
             "https://" .
             $_SERVER["HTTP_HOST"] .
