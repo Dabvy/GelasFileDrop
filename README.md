@@ -16,7 +16,7 @@ Alleen ingelogde gebruikers hebben toegang tot bestanden. Het systeem draait uit
 
 Bestanden worden gecontroleerd bij upload en alleen toegestane bestandstypen worden geaccepteerd.
 
-##Authenticatie
+##A uthenticatie
 
 Gebruikers moeten inloggen voordat zij gebruik kunnen maken van upload- en downloadfuncties.
 
