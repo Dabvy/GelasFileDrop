@@ -12,158 +12,140 @@ if (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] == 'off') {
     exit;
 }
 
-// Database (PDO)
-try {
-    $db = new PDO(
-        "mysql:host=localhost;dbname=filedrop;charset=utf8mb4",
-        "root",
-        ""
-    );
+// Verbinding met database
+$db = new mysqli("localhost", "root", "", "filedrop");
 
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-} catch (PDOException $e) {
-    die("Database connection failed.");
+if ($db->connect_error) {
+    die("Verbinding mislukt: " . $db->connect_error);
 }
 
-/**
- * Functie om data te versleutelen met AES-256-CBC
- */
-function encryptData($plaintext, $key) {
-    // Bepaal de lengte van de Initialisatie Vector (IV) die nodig is voor AES-256-CBC (16 bytes)
-    $ivLength = openssl_cipher_iv_length('aes-256-cbc');
-    // Genereer een cryptografisch veilige, willekeurige IV
-    $iv = openssl_random_pseudo_bytes($ivLength);
-    // Versleutel de data
-    $ciphertext = openssl_encrypt($plaintext, 'aes-256-cbc', $key, 0, $iv);
-    // Plak de IV voor de versleutelde tekst en zet het om naar Base64 voor veilige opslag
-    return base64_encode($iv . $ciphertext);
+// Geheime sleutel voor encryptie (Zelfde als in download.php!)
+define('ENCRYPTION_KEY', 'JouwSuperGeheimeSleutel123!#'); 
+
+// Download bestand via ID (Oude fallback - mag blijven of weg, download.php handelt nu de shares af)
+if (isset($_GET["id"])) {
+    $s = $db->prepare("SELECT filename,mime_type,file_data,recipient FROM uploads WHERE id=?");
+    $s->bind_param("s", $_GET["id"]);
+    $s->execute();
+    if ($f = $s->get_result()->fetch_assoc()) {
+        if ($_SESSION["username"] !== $f["recipient"]) {
+            exit("You are not allowed to download this file.");
+        }
+        header("Content-Type: " . $f["mime_type"]);
+        header('Content-Disposition: attachment; filename="' . $f["filename"] . '"');
+        exit($f["file_data"]);
+    }
+    exit("File not found");
 }
 
-/**
- * Functie om data te ontsleutelen
- */
-function decryptData($encryptedData, $key) {
-    // Decodeer de Base64 string naar de ruwe IV + ciphertext combinatie
-    $data = base64_decode($encryptedData);
-    // Bepaal de IV lengte
-    $ivLength = openssl_cipher_iv_length('aes-256-cbc');
-    // Snijd de eerste 16 bytes eruit: dit is de originele IV
-    $iv = substr($data, 0, $ivLength);
-    // De rest van de string is de daadwerkelijke versleutelde tekst (ciphertext)
-    $ciphertext = substr($data, $ivLength);
-    // Ontsleutel de ciphertext met de sleutel en de IV
-    return openssl_decrypt($ciphertext, 'aes-256-cbc', $key, 0, $iv);
-}
+$error = "";
 
-// De geheime encryptiesleutel (moet exact 32 bytes lang zijn voor AES-256)
-$key = '6057110_this_needs_to_be_32_bytes'; 
-$melding = "";
+// Upload verwerken
+if (!empty($_FILES["filename"]) && $_FILES["filename"]["error"] == 0) {
 
-// Controleren of het formulier is verzonden (POST) en of het bestand zonder fouten is geüpload
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['geheimBestand']) && $_FILES['geheimBestand']['error'] === UPLOAD_ERR_OK) {
-    
-    // Haal de tijdelijke locatie, de naam en de extensie van het geüploade bestand op
-    $fileTmpPath = $_FILES['geheimBestand']['tmp_name'];
-    $fileName = $_FILES['geheimBestand']['name'];
-    $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-    
-    // Lijst met bestandstypen die ons systeem accepteert
-    $toegestaneExtensies = ['jpg', 'jpeg', 'png', 'gif'];
-    
-    // Controleer of de extensie van het geüploade bestand is toegestaan
-    if (in_array($fileExtension, $toegestaneExtensies)) {
-        
-        // 1. Lees de ruwe binaire inhoud van de geüploade afbeelding in
-        $rawImageData = file_get_contents($fileTmpPath);
+    $recipient = trim($_POST["recipient"] ?? "");
 
-        // 2. Versleutel de afbeeldingsdata en sla het resultaat op in bestandE.php
-        $encryptedData = encryptData($rawImageData, $key);
-        file_put_contents('bestandE.php', $encryptedData);
+    // Controleer of gebruiker bestaat
+    $check = $db->prepare("SELECT id FROM users WHERE username=?");
+    $check->bind_param("s", $recipient);
+    $check->execute();
 
-        // 3. Lees de versleutelde data direct weer uit bestandE.php en ontsleutel deze
-        $encryptedContentFromFile = file_get_contents('bestandE.php');
-        $decryptedImageData = decryptData($encryptedContentFromFile, $key);
+    if (!$check->get_result()->fetch_assoc()) {
+        $error = "User does not exist.";
+    }
 
-        // Bepaal het juiste Mime-type (nodig voor de browser, zet 'jpg' om naar 'jpeg')
-        $mimeType = 'image/' . ($fileExtension === 'jpg' ? 'jpeg' : $fileExtension);
-        
-        // Zet de ontsleutelde binaire data om naar een Base64 string
-        $base64Image = base64_encode($decryptedImageData);
-        // Bouw een Data URL op zodat de afbeelding direct in HTML/JS gebruikt kan worden zonder fysiek bestand
-        $dataUrl = 'data:' . $mimeType . ';base64,' . $base64Image;
+    $ext = strtolower(pathinfo($_FILES["filename"]["name"], PATHINFO_EXTENSION));
+    $allowed = ["png", "jpg", "jpeg", "gif"];
 
-        // 4. Bouw de broncode voor het nieuwe bestandP.php op
-        $phpCodeVoorBestandP = "<?php\n?>\n";
-        $phpCodeVoorBestandP .= "<!DOCTYPE html>\n<html lang='nl'>\n<head>\n";
-        $phpCodeVoorBestandP .= "    <meta charset='UTF-8'>\n    <title>Ontsleuteld Bestand</title>\n</head>\n<body>\n\n";
-        $phpCodeVoorBestandP .= "    <h1>Ontsleutelde Afbeelding:</h1>\n";
-        
-        // Voeg de img-tag toe met de Data URL als bron om de afbeelding op het scherm te tonen
-        $phpCodeVoorBestandP .= "    <img src='" . $dataUrl . "' alt='Ontsleuteld' style='max-width:100%; height:auto;'><br><br>\n";
-        $phpCodeVoorBestandP .= "    <p>Als het goed is, is de download ook automatisch gestart.</p>\n\n";
-        
-        // Voeg JavaScript toe die direct na het laden een onzichtbare downloadlink aanmaakt en 'aanklikt'
-        $phpCodeVoorBestandP .= "    <script>\n";
-        $phpCodeVoorBestandP .= "    window.addEventListener('DOMContentLoaded', () => {\n";
-        $phpCodeVoorBestandP .= "        const link = document.createElement('a');\n"; // Maak een <a> element aan
-        $phpCodeVoorBestandP .= "        link.href = '" . $dataUrl . "';\n";           // Koppel de afbeelding aan de link
-        $phpCodeVoorBestandP .= "        link.download = 'gedownload_bestand." . $fileExtension . "';\n"; // Geef de downloadnaam mee
-        $phpCodeVoorBestandP .= "        document.body.appendChild(link);\n";          // Voeg link tijdelijk toe aan de pagina
-        $phpCodeVoorBestandP .= "        link.click();\n";                             // Klik er automatisch op
-        $phpCodeVoorBestandP .= "        document.body.removeChild(link);\n";          // Verwijder de link direct weer
-        $phpCodeVoorBestandP .= "    });\n";
-        $phpCodeVoorBestandP .= "    </script>\n\n";
-        
-        $phpCodeVoorBestandP .= "</body>\n</html>";
-        
-        // Schrijf de opgebouwde HTML en JavaScript code daadwerkelijk weg naar bestandP.php
-        file_put_contents('bestandP.php', $phpCodeVoorBestandP);
-        
-        // Toon succesmelding met een link naar het resultaat
-        $melding = "<p style='color: green;'>Afbeelding verwerkt! Open <a href='bestandP.php' target='_blank'>bestandP.php</a> om het te bekijken en te downloaden.</p>";
-    } else {
-        // Foutmelding als het bestandstype niet in de lijst stond
-        $melding = "<p style='color: red;'>Fout: Alleen JPG, JPEG, PNG en GIF bestanden zijn toegestaan.</p>";
+    if (!$error) {
+        if (!in_array($ext, $allowed)) {
+            $error = "Only PNG, JPG, JPEG and GIF allowed.";
+        } elseif ($_FILES["filename"]["size"] > 1048576) {
+            $error = "Max size is 1 MB.";
+        } elseif (!getimagesize($_FILES["filename"]["tmp_name"])) {
+            $error = "Invalid image.";
+        } else {
+
+            // 1. Genereer een veilige SHA-256 Hash voor de unieke link
+            $file_id = hash('sha256', uniqid(rand(), true));
+            $name = $_FILES["filename"]["name"];
+            $mime = mime_content_type($_FILES["filename"]["tmp_name"]);
+            $raw_data = file_get_contents($_FILES["filename"]["tmp_name"]);
+
+            // 2. ENCRYPTIE van de bestandsdata (AES-256)
+            $iv_length = openssl_cipher_iv_length('aes-256-cbc');
+            $iv = openssl_random_pseudo_bytes($iv_length);
+            $encrypted_data = openssl_encrypt($raw_data, 'aes-256-cbc', ENCRYPTION_KEY, 0, $iv);
+            
+            // Voeg de IV toe aan de payload en encodeer naar Base64 voor veilige database opslag
+            $final_payload = base64_encode($iv . $encrypted_data);
+
+            // 3. Opslaan in database (Inclusief sender voor het overzicht)
+            $s = $db->prepare(
+                "INSERT INTO uploads (id, filename, mime_type, file_data, recipient, sender)
+                 VALUES (?, ?, ?, ?, ?, ?)"
+            );
+            
+            $sender = $_SESSION["username"];
+            $s->bind_param("ssssss", $file_id, $name, $mime, $final_payload, $recipient, $sender);
+            $s->execute();
+
+            // 4. Maak de link op een schone manier die gegarandeerd naar download.php leidt
+            $current_dir = rtrim(dirname($_SERVER["PHP_SELF"]), '/\\');
+            $_SESSION["link"] = "https://" . $_SERVER["HTTP_HOST"] . $current_dir . "/download.php?file=" . $file_id;
+
+            header("Location: " . $_SERVER["PHP_SELF"]);
+            exit;
+        }
     }
 }
 
+// Link ophalen en daarna verwijderen uit sessie
+$link = $_SESSION["link"] ?? "";
+unset($_SESSION["link"]);
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="nl">
 <head>
+    <meta charset="UTF-8">
     <title>GelasFileDrop</title>
 </head>
 <body>
 
-<h2>GelasFileDrop</h2>
+<div class="container">
+    <h2>GelasFileDrop</h2>
 
-<p>
-    Logged in as:
-    <?= htmlspecialchars($_SESSION["username"] ?? "Unknown") ?>
-</p>
+    <p>Logged in as: <strong><?= htmlspecialchars($_SESSION["username"]) ?></strong></p>
 
-<p>
-    <a href="loginLogic/logout.php">Logout</a>
-</p>
+    <p>
+        <a href="loginLogic/logout.php">Logout</a>
+        <?php if (isset($_SESSION["role"]) && $_SESSION["role"] === "admin"): ?>
+            <a href="loginLogic/admin.php" class="admin-btn">Naar Admin Panel</a>
+        <?php endif; ?>
+    </p>
 
-<ul>
-    <li>PNG</li>
-    <li>JPG</li>
-    <li>JPEG</li>
-    <li>GIF</li>
-</ul>
+    <p>Toegestane bestanden: PNG, JPG, JPEG, GIF (Max 1 MB)</p>
 
-<p>Max size: 1 MB</p>
+    <?php if ($error) echo "<p style='color: red;'>$error</p>"; ?>
 
-    <?php echo $melding; ?>
-    
-    <form method="POST" action="bestand.php" enctype="multipart/form-data">
-        <input type="file" name="geheimBestand" accept="image/png, image/jpeg, image/jpg, image/gif" required><br><br>
-        <button type="submit">Upload en Versleutel Afbeelding</button>
+    <form method="post" enctype="multipart/form-data">
+        <input type="text" name="recipient" placeholder="Send to username" required><br><br>
+        <input type="file" name="filename" accept=".png,.jpg,.jpeg,.gif" required><br><br>
+        <input type="submit" value="Upload & Versleutel">
     </form>
 
+    <?php if ($link): ?>
+        <hr>
+        <p style="color: #28a745; font-weight: bold;">Bestand succesvol versleuteld en opgeslagen!</p>
+        <p>Stuur de onderstaande link naar de ontvanger:</p>
+        <div class="link-box">
+            <a href="<?= htmlspecialchars($link) ?>" id="link"><?= htmlspecialchars($link) ?></a>
+        </div>
+        <br>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('link').href)">Kopieer Link</button>
+    <?php endif; ?>
+</div>
 
 </body>
 </html>
