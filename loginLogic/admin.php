@@ -95,28 +95,6 @@ $logs_result = $conn->query("SELECT username, action, details, created_at FROM l
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Filedrop - Complete Admin Panel</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; padding: 20px; margin: 0; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
-        h2 { color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px; }
-        h3 { color: #555; margin-top: 20px; background: #e9ecef; padding: 10px; border-radius: 4px; }
-        .section { margin-bottom: 30px; }
-        .meta-info { font-size: 14px; color: #666; margin-bottom: 20px; }
-        .meta-info a { color: #007BFF; text-decoration: none; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #343a40; color: white; }
-        tr:hover { background-color: #f9f9f9; }
-        .role-select { padding: 5px; border-radius: 4px; border: 1px solid #ccc; }
-        .save-btn { padding: 5px 10px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .save-btn:hover { background-color: #218838; }
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
-        .badge-admin { background-color: #e2d9ff; color: #4b1557; }
-        .badge-user { background-color: #e2e3e5; color: #383d41; }
-        .badge-upload { background-color: #d4edda; color: #155724; }
-        .badge-download { background-color: #cce5ff; color: #004085; }
-        .badge-failed { background-color: #f8d7da; color: #721c24; }
-    </style>
 </head>
 <body>
 
