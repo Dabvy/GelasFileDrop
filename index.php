@@ -1,4 +1,6 @@
 <?php
+// Zorg dat de sessie overal op de website (ook in submappen) gelezen kan worden
+session_set_cookie_params(0, '/');
 session_start();
 
 if (!isset($_SESSION["user_id"])) {
@@ -17,6 +19,14 @@ $db = new mysqli("localhost", "root", "", "filedrop");
 
 if ($db->connect_error) {
     die("Verbinding mislukt: " . $db->connect_error);
+}
+
+// 1. CENTRALE LOG-FUNCTIE TOEGEVOEGD
+function logActivity($conn, $username, $action, $details) {
+    $stmt = $conn->prepare("INSERT INTO logs (username, action, details) VALUES (?, ?, ?)");
+    $stmt->bind_param("sss", $username, $action, $details);
+    $stmt->execute();
+    $stmt->close();
 }
 
 // Geheime sleutel voor encryptie (Zelfde als in download.php!)
@@ -88,7 +98,14 @@ if (!empty($_FILES["filename"]) && $_FILES["filename"]["error"] == 0) {
             
             $sender = $_SESSION["username"];
             $s->bind_param("ssssss", $file_id, $name, $mime, $final_payload, $recipient, $sender);
-            $s->execute();
+            
+            // Zodra de database insert gelukt is, schrijven we het logboek weg
+            if ($s->execute()) {
+                // --- HIER WORDT DE VERZENDING GELOGD ---
+                logActivity($db, $sender, "Upload", $sender . " heeft bestand '" . $name . "' verzonden naar " . $recipient);
+                // --- EINDE LOG-LOGICA ---
+            }
+            $s->close();
 
             // 4. Maak de link op een schone manier die gegarandeerd naar download.php leidt
             $current_dir = rtrim(dirname($_SERVER["PHP_SELF"]), '/\\');
@@ -149,3 +166,4 @@ unset($_SESSION["link"]);
 
 </body>
 </html>
+<?php $db->close(); ?>

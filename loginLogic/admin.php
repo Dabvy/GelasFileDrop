@@ -20,6 +20,8 @@ if (!isset($_SESSION["user_id"]) || $_SESSION["role"] !== "admin") {
 }
 
 // 3. CENTRALE LOG-FUNCTIE
+// Tip: Zet deze functie samen met de databaseverbinding in een apart bestand (bijv. config.php)
+// zodat je deze ook in login.php en download.php kunt aanroepen!
 function logActivity($conn, $username, $action, $details) {
     $stmt = $conn->prepare("INSERT INTO logs (username, action, details) VALUES (?, ?, ?)");
     $stmt->bind_param("sss", $username, $action, $details);
@@ -59,7 +61,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action_type']) && $_PO
 // A. Alle Gebruikers / Accounts
 $users_result = $conn->query("SELECT id, username, role, created_at FROM users ORDER BY username ASC");
 
-// B. Alle Bestanden (Uploads) - DYNAMISCHE DOCKING (Voorkomt SQL-fouten)
+// B. Alle Bestanden (Uploads)
 $columns_check = $conn->query("SHOW COLUMNS FROM uploads");
 $columns = [];
 if ($columns_check) {
@@ -85,7 +87,7 @@ if (!empty($select_fields)) {
     $uploads_result = false;
 }
 
-// C. Alle Acties (Logs)
+// C. Alle Acties (Logs) - Haalt nu ook 'Download' en 'Failed Login' op!
 $logs_result = $conn->query("SELECT username, action, details, created_at FROM logs ORDER BY created_at DESC LIMIT 100");
 ?>
 
@@ -95,42 +97,20 @@ $logs_result = $conn->query("SELECT username, action, details, created_at FROM l
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Filedrop - Complete Admin Panel</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; padding: 20px; margin: 0; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
-        h2 { color: #333; margin-top: 0; border-bottom: 2px solid #007BFF; padding-bottom: 10px; }
-        h3 { color: #555; margin-top: 20px; background: #e9ecef; padding: 10px; border-radius: 4px; }
-        .section { margin-bottom: 30px; }
-        .meta-info { font-size: 14px; color: #666; margin-bottom: 20px; }
-        .meta-info a { color: #007BFF; text-decoration: none; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #343a40; color: white; }
-        tr:hover { background-color: #f9f9f9; }
-        .role-select { padding: 5px; border-radius: 4px; border: 1px solid #ccc; }
-        .save-btn { padding: 5px 10px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .save-btn:hover { background-color: #218838; }
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
-        .badge-admin { background-color: #e2d9ff; color: #4b1557; }
-        .badge-user { background-color: #e2e3e5; color: #383d41; }
-        .badge-upload { background-color: #d4edda; color: #155724; }
-        .badge-download { background-color: #cce5ff; color: #004085; }
-        .badge-failed { background-color: #f8d7da; color: #721c24; }
-    </style>
 </head>
 <body>
 
 <div class="container">
     <h2>Admin Dashboard - Overzicht</h2>
     <div class="meta-info">
-        Ingelogd als: <span class="badge badge-admin"><?= htmlspecialchars($_SESSION["username"]) ?></span> | 
+        Ingelogd als: <span class="badge badge-admin"><?= htmlspecialchars($_SESSION["username"] ?? 'Admin') ?></span> | 
         <a href="../index.php">Naar Applicatie (Home)</a>
     </div>
 
     <?php if (isset($msg)) echo $msg; ?>
 
     <div class="section">
-        <h3>👥 Geregistreerde Accounts & Rechten</h3>
+        <h3>Geregistreerde Accounts & Rechten</h3>
         <table>
             <thead>
                 <tr>
@@ -174,7 +154,7 @@ $logs_result = $conn->query("SELECT username, action, details, created_at FROM l
     </div>
 
     <div class="section">
-        <h3>📁 Geüploade Bestanden</h3>
+        <h3>Geüploade Bestanden</h3>
         <table>
             <thead>
                 <tr>
@@ -187,7 +167,7 @@ $logs_result = $conn->query("SELECT username, action, details, created_at FROM l
                 <?php if ($uploads_result && $uploads_result->num_rows > 0): ?>
                     <?php while($file = $uploads_result->fetch_assoc()): ?>
                         <tr>
-                            <td>📄 <?= htmlspecialchars($file['filename'] ?? $file['bestandsnaam'] ?? 'Onbekend bestand') ?></td>
+                            <td><?= htmlspecialchars($file['filename'] ?? $file['bestandsnaam'] ?? 'Onbekend bestand') ?></td>
                             <td><?= htmlspecialchars($file['username'] ?? $file['user_id'] ?? 'Onbekend') ?></td>
                             <td><?= htmlspecialchars($file['uploaded_at'] ?? $file['datum'] ?? '-') ?></td>
                         </tr>
@@ -202,7 +182,7 @@ $logs_result = $conn->query("SELECT username, action, details, created_at FROM l
     </div>
 
     <div class="section">
-        <h3>📜 Systeem Acties & Logs (Laatste 100)</h3>
+        <h3>Systeem Acties & Logs (Laatste 100)</h3>
         <table>
             <thead>
                 <tr>
