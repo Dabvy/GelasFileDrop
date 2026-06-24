@@ -1,6 +1,12 @@
 <?php
+// Zorg dat de sessie overal op de website (ook in submappen) gelezen kan worden
 session_set_cookie_params(0, '/');
 session_start();
+
+if (!isset($_SESSION["user_id"])) {
+    header("Location: loginLogic/login.php");
+    exit;
+}
 
 $db = new mysqli("localhost", "root", "", "filedrop");
 
@@ -8,7 +14,7 @@ if ($db->connect_error) {
     die("Verbinding mislukt: " . $db->connect_error);
 }
 
-// Centrale functie om inlogpogingen te loggen naar de database
+// 1. CENTRALE LOG-FUNCTIE
 function logActivity($conn, $username, $action, $details) {
     $stmt = $conn->prepare("INSERT INTO logs (username, action, details) VALUES (?, ?, ?)");
     $stmt->bind_param("sss", $username, $action, $details);
@@ -16,54 +22,72 @@ function logActivity($conn, $username, $action, $details) {
     $stmt->close();
 }
 
-$error = "";
+// EXACT dezelfde sleutel als in index.php!
+define('ENCRYPTION_KEY', 'JouwSuperGeheimeSleutel123!#'); 
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+$file_info = null;
+$decrypted_image_base64 = "";
 
-    $username = trim($_POST["username"]);
-    $password = $_POST["password"];
+if (isset($_GET["file"])) {
+    $file_hash = $_GET["file"];
 
-    // We halen id, password én de actuele role op uit de database
-    $s = $db->prepare(
-        "SELECT id, password, role
-         FROM users
-         WHERE username=?"
-    );
-
-    $s->bind_param("s", $username);
+    // Haal het bestand op via de id/hash
+    $s = $db->prepare("SELECT filename, mime_type, file_data, recipient, sender FROM uploads WHERE id=?");
+    $s->bind_param("s", $file_hash);
     $s->execute();
+    $file_info = $s->get_result()->fetch_assoc();
 
-    $user = $s->get_result()->fetch_assoc();
-
-    // Controleer of de gebruiker bestaat en het wachtwoord klopt
-    if ($user && password_verify($password, $user["password"])) {
-
-        // Genereer een nieuw sessie-ID voor de veiligheid
-        session_regenerate_id(true);
-
-        // Sla de actuele gegevens live op in de sessie
-        $_SESSION["user_id"] = $user["id"];
-        $_SESSION["username"] = $username;
-        $_SESSION["role"] = $user["role"]; 
-
-        // Optioneel: Je zou hier ook een SUCCESVOLLE login kunnen loggen als je wilt
-        // logActivity($db, $username, "Login", "Gebruiker is succesvol ingelogd");
-
-        // Stuur de gebruiker door naar de juiste pagina op basis van de rol in de database
-        if ($_SESSION["role"] === "admin") {
-            header("Location: admin.php"); // Direct naar het admin panel
-        } else {
-            header("Location: ../index.php"); // Normale gebruiker naar de homepage
+    if ($file_info) {
+        // Controleer of de ingelogde persoon wel de ontvanger is
+        if ($_SESSION["username"] !== $file_info["recipient"]) {
+            exit("<h3>Toegang geweigerd. Dit bestand is niet voor jou bestemd.</h3>");
         }
-        exit;
-    } else {
-        // HIER GEBEURT HET NU DIRECT: Als de gegevens NIET kloppen (verkeerd wachtwoord of gebruiker bestaat niet)
-        // We loggen ook het IP-adres erbij voor extra veiligheid
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'Onbekend IP';
-        logActivity($db, $username, "Failed Login", "Inlogpoging mislukt voor account '" . $username . "' vanaf IP: " . $ip);
+
+        // DECRYPTIE van de bestandsdata
+        $raw_payload = base64_decode($file_info["file_data"]);
+        $iv_length = openssl_cipher_iv_length('aes-256-cbc');
         
-        $error = "Wrong username or password";
+        // Splits de IV en de gecodeerde data weer op
+        $iv = substr($raw_payload, 0, $iv_length);
+        $encrypted_data = substr($raw_payload, $iv_length);
+        
+        $decrypted_data = openssl_decrypt($encrypted_data, 'aes-256-cbc', ENCRYPTION_KEY, 0, $iv);
+
+        if ($decrypted_data === false) {
+            exit("<h3>Fout: Decryptie mislukt. Sleutel of data is corrupt.</h3>");
+        }
+
+        // --- HIER WORDT DE GEBRUIKERSNAAM ACHTERHAALD EN GELOGD ---
+        $username = $_SESSION["username"] ?? '';
+
+        // Als de username leeg is in de sessie, haal hem dan direct op via het user_id uit de database
+        if (empty($username) && isset($_SESSION["user_id"])) {
+            $u_stmt = $db->prepare("SELECT username FROM users WHERE id = ?");
+            $u_stmt->bind_param("i", $_SESSION["user_id"]);
+            $u_stmt->execute();
+            $u_result = $u_stmt->get_result()->fetch_assoc();
+            if ($u_result) {
+                $username = $u_result['username'];
+                $_SESSION["username"] = $username; 
+            }
+            $u_stmt->close();
+        }
+// HIER AANGEPAST: Logt nu zowel de afzender ($afzender) als de downloader ($username) in de details
+        $afzender = $file_info['sender'] ?? 'Onbekend';
+        logActivity($db, $username, "Download", $username . " heeft bestand '" . $file_info["filename"] . "' gedownload (Verzonden door: " . $afzender . ")");
+
+        // HIER AANGEPAST: De afzender staat nu vooraan in de details-zin
+        $afzender = $file_info['sender'] ?? 'Onbekend';
+        logActivity($db, $username, "Download", $afzender . " heeft bestand '" . $file_info["filename"] . "' gedownload");
+        // --- EINDE LOG-LOGICA ---
+
+        // Zet om naar een schone Base64 string voor de HTML en JavaScript auto-download
+        $decrypted_image_base64 = 'data:' . $file_info['mime_type'] . ';base64,' . base64_encode($decrypted_data);
+    } else {
+        exit("<h3>Bestand niet gevonden of de link is ongeldig.</h3>");
     }
+} else {
+    exit("<h3>Geen bestand gespecificeerd.</h3>");
 }
 ?>
 
@@ -71,38 +95,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>Filedrop - Ontvangen Bestand</title>
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<div class="login-container">
-    <h2>Login</h2>
+<div class="box">
+    <h2>Je hebt een bestand ontvangen!</h2>
+    
+    <div class="meta">
+        <strong>Afzender:</strong> <?= htmlspecialchars($file_info['sender'] ?? 'Onbekend') ?><br>
+        <strong>Bestandsnaam:</strong> <?= htmlspecialchars($file_info['filename']) ?>
+    </div>
 
-    <?php if ($error): ?>
-    <p style="color: red; text-align: center; font-size: 14px; font-weight: bold;"><?= htmlspecialchars($error) ?></p>
-    <?php endif; ?>
+    <p>Hier is je bestand:</p>
+    
+    <img src="<?= $decrypted_image_base64 ?>" alt="Ontvangen afbeelding">
 
-    <form method="post">
-        <input
-            type="text"
-            name="username"
-            placeholder="Username"
-            required
-        >
-
-        <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            required
-        >
-
-        <div class="button-group">
-            <input type="submit" value="Login">
-            <a href="register.php" class="register-btn">Registreer hier</a>
-        </div>
-    </form>
+    <br>
+    <a href="<?= $decrypted_image_base64 ?>" download="<?= htmlspecialchars($file_info['filename']) ?>" class="btn">Klik hier als de download niet start</a>
 </div>
 
 </body>

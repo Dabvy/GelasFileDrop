@@ -127,6 +127,7 @@ unset($_SESSION["link"]);
 <head>
     <meta charset="UTF-8">
     <title>GelasFileDrop</title>
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
