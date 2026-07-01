@@ -14,7 +14,7 @@ if ($conn->connect_error) {
 }
 
 // 2. BEVEILIGING: Alleen voor admins
-if (!isset($_SESSION["user_id"]) || $_SESSION["role"] !== "admin") {
+if (!isset($_SESSION["user_id"]) || $_SESSION["role"] == "admin") {
     header("Location: login.php");
     exit;
 }
