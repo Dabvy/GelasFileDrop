@@ -47,7 +47,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body>
 <div class="register-container">
-    <h2>Inloggen bij Filedrop</h2>
+    <h2>Inloggen bij GelasFiledrop</h2>
     
     <?php if ($error) echo "<p style='color: red;'>$error</p>"; ?>
 
